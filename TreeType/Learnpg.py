@@ -15,6 +15,50 @@ sfmt = QtGui.QSurfaceFormat()
 sfmt.setSwapInterval(0)
 QtGui.QSurfaceFormat.setDefaultFormat(sfmt)
 
+
+import numpy as np
+import pyqtgraph as pg
+from pyqtgraph.console import ConsoleWidget
+from pyqtgraph.dockarea.Dock import Dock
+from pyqtgraph.dockarea.DockArea import DockArea
+from pyqtgraph.Qt import QtWidgets
+
+
+class TreeDockWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(TreeDockWidget, self).__init__()
+        self.area = DockArea()
+        # self.setCentralWidget(self.area)
+        self.l = QtWidgets.QVBoxLayout()
+        self.setLayout(self.l)
+        self.l.addWidget(self.area)
+        self.d1 = Dock("Dock1",closable=False)     ## give this dock the minimum possible size
+        self.d2 = Dock("Dock2 - Console", closable=False)
+        self.area.addDock(self.d1, 'left')      ## place d1 at left edge of dock area (it will fill the whole space since there are no other docks yet)
+        self.area.addDock(self.d2, 'right')     ## place d2 at right edge of dock area
+        ## first dock gets save/restore buttons
+        self.w1 = pg.LayoutWidget()
+        self.label = QtWidgets.QTextEdit()
+        self.label.setText("          ")
+        self.saveBtn = QtWidgets.QPushButton('Save dock state')
+        self.restoreBtn = QtWidgets.QPushButton('Restore dock state')
+        self.restoreBtn.setEnabled(False)
+        self.w1.addWidget(self.label, row=0, col=0)
+        self.w1.addWidget(self.saveBtn, row=1, col=0)
+        self.w1.addWidget(self.restoreBtn, row=2, col=0)
+        self.d1.addWidget(self.w1)
+
+        self.saveBtn.clicked.connect(self.save)
+        self.restoreBtn.clicked.connect(self.load)
+        self.w2 = ConsoleWidget()
+        self.d2.addWidget(self.w2)
+    def save(self):
+        self.state = self.area.saveState()
+        self.restoreBtn.setEnabled(True)
+    def load(self):
+        self.area.restoreState(self.state)
+
+
 global data, connect_array, ptr
 
 
@@ -56,8 +100,46 @@ class Treepara(ptree.ParameterTree):
                 dict(name='connect', type='list', limits=['all', 'pairs', 'finite', 'array'], value='all'),
                 dict(name='fill', type='bool', value=False),
                 dict(name='skipFiniteCheck', type='bool', value=False),
-                dict(name='plotMethod', title='Plot Method', type='list', limits=['pyqtgraph', 'drawPolyline'])
+                dict(name='plotMethod', title='Plot Method', type='list', limits=['pyqtgraph', 'drawPolyline']),
+                dict(name="TCP Server", title="TCP Server",type='group', children=[
+                    dict(name='IP', title='IP', type='str', value="0,0,0,0"),
+                    dict(name='Port', title='Port', type='int', value=8888),
+                    dict(name='Clients', title='Clients', children=
+                         [dict(name='client1', title='0,0,0,0 : 0000', type='bool', value=False)]),
+                    dict(name='Hex_Send', title='Hex_Send', type='bool', value=True),
+                    dict(name='Hex_Receive', title='Hex_Receive', type='bool', value=True),
+                ]),
+                dict(name="UDP", title="UDP", type='group', children=[
+                    dict(name='IP', title='IP', type='str', value="0,0,0,0"),
+                    dict(name='Port', title='Port', type='int', value=8888),
+                    dict(name='Target', title='0,0,0,0 : 0000', type='bool', value=False),
+                    dict(name='Hex_Send', title='Hex_Send', type='bool', value=True),
+                    dict(name='Hex_Receive', title='Hex_Receive', type='bool', value=True),
+                ]),
+                dict(name="Serial", title="Serial", type='group', children=[
+                    dict(name='COM', title='COM', type='list', limits=["COMX"]),
+                    dict(name='Baud_Rate', title='Baud_Rate', type='list', limits=["9600", "115200"]),
+                    dict(name='Hex_Send', title='Hex_Send', type='bool', value=True),
+                    dict(name='Hex_Receive', title='Hex_Receive', type='bool', value=True),
+                ]),
+                dict(name="Local_File", title="Local_File", type='group', children=[
+                    dict(name='CSV', title='CSV', type='bool', value=True),
+                    dict(name='File', title='File', type='str', value=".."),
+                    dict(name='Interval', title='Interval(ms)', type='int', value=8),
+                    dict(name='Hex_Send', title='Hex_Send', type='bool', value=True),
+                    dict(name='Hex_Receive', title='Hex_Receive', type='bool', value=True),
+                ])
             ]
+            # self.children = [
+            #
+            # dict(name="TCP Server", title="TCP Server", type="group", children=[
+            #     dict(name='IP', title='IP', type='str', value="0,0,0,0"),
+            #     dict(name='Port', title='Port', type='int', value=8888),
+            #     dict(name='Clients', title='Clients', type='list', limits=['0.0.0.0 : 0000']),
+            #     dict(name='Hex_Send', title='Hex_Send', type='bool', value=True),
+            #     dict(name='Hex_Receive', title='Hex_Receive', type='bool', value=True),
+            # ]),
+            # ]
         else:
             self.children = exchild
 
@@ -74,13 +156,20 @@ class Treepara(ptree.ParameterTree):
 class Wdigetfortree(QtWidgets.QSplitter):
     def __init__(self):
         super(Wdigetfortree, self).__init__()
+        self.subsplitter = QtWidgets.QSplitter()
+        self.subsplitter.setOrientation(Qt.Vertical)
+        self.terminal = TreeDockWidget()
         self.pTree = Treepara(None)
+
+        self.subsplitter.addWidget(self.pTree)
+        self.subsplitter.addWidget(self.terminal)
+
         self.pw = pg.PlotWidget()
         self.pw.setWindowTitle('pyqtgraph example: PlotSpeedTest')
         self.pw.setLabel('bottom', 'Index', units='B')
         self.curve = MonkeyCurveItem(pen=pg.mkPen(), brush='g')
         self.pw.addItem(self.curve)
-        self.addWidget(self.pTree)
+        self.addWidget(self.subsplitter)
         self.addWidget(self.pw)
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
