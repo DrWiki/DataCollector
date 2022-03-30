@@ -1,4 +1,4 @@
-import ParentUI.RAL as UI
+import ParentUI.XXXX as UI
 import Universaltool.Control.ControlBoxTab as Control
 import sys
 import pyqtgraph as pg

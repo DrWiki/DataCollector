@@ -11,16 +11,12 @@ import Metadata
 import struct
 import pyqtgraph as pg
 import Universaltool.TransLogic.stopThreading as THREAD
-import socket
-
 
 class ControlBoxTab(ControlTab.Ui_Form, QtWidgets.QWidget, UDP.UdpLogic, TCP.TcpLogic, SER.PyQt_Serial):
     def __init__(self, parent=None, ):
         super(ControlBoxTab,self).__init__(parent)
         self.setupUi(self)
-        self.metadata = Metadata.metadata()
-        self.NewTimerX = threading.Thread(target=self.NewTimerfunX)
-        self.NewTimerY = threading.Thread(target=self.NewTimerfunY)
+        self.metadata = Metadata.metadata(5)
         if parent == None:
             self.resize(720, 1080)
 
@@ -30,10 +26,10 @@ class ControlBoxTab(ControlTab.Ui_Form, QtWidgets.QWidget, UDP.UdpLogic, TCP.Tcp
         self.SBTCPServer.setValue(8090)
         self.LETCPServer.setText(str(self.IP))
         self.LEUDP.setText(str(self.IP))
+
+        #
         self.CONNECT()
         self.signal_write_terminal.emit(self.IP+'\n')
-
-
 
     def CONNECT(self):
         self.BTFilePath.clicked.connect(self.ChooseFile)
@@ -43,61 +39,23 @@ class ControlBoxTab(ControlTab.Ui_Form, QtWidgets.QWidget, UDP.UdpLogic, TCP.Tcp
         self.signal_PackedDataComing.connect(self.Datasplit)
         self.TAB.currentChanged.connect(self.Management)
 
-    def Management(self, index):
-        pass
-        # if index == 0:
-        #
-        # elif index ==1:
-        # elif index == 2:
-        # elif index ==3:
 
     def write_msg(self, msg):
-        self.TERceive.insertPlainText(msg+"\n")
+        self.TERceive.insertPlainText(msg+"\n") # 这个地方的坑在于继承类的加载顺序
         self.TERceive.moveCursor(QtGui.QTextCursor.End)
-
 
     def write_terminal(self, msg):
         self.TEcmd.insertPlainText(msg+"\n")
         # 滚动条移动到结尾
         self.TEcmd.moveCursor(QtGui.QTextCursor.End)
 
-    def Datasplit(self, msg):
-        ans = self.TAB.currentIndex()
-        if ans==0:
-            datas = struct.unpack('<iiiii', msg)
-
-            self.metadata.DataStreamT.append(datas[0])
-
-            self.metadata.NUM += 1
-            self.metadata.trig += 1
-            self.metadata.Silence += 1
-            self.metadata.DataStreamsudoT.append(self.metadata.NUM)
-
-            self.metadata.CurrentdataX = datas[1]
-            self.metadata.DataStreamX.append(datas[1])
-            self.metadata.datareadyX = True
-
-            self.metadata.CurrentdataY = datas[2]
-            self.metadata.DataStreamY.append(datas[2])
-            self.metadata.datareadyY = True
-
-            self.metadata.CurrentdataZ = datas[3]
-            self.metadata.DataStreamZ.append(datas[3])
-            self.metadata.datareadyZ = True
-
-            self.metadata.CurrentdataRX = datas[4]
-            self.metadata.DataStreamRX.append(datas[4])
-            self.metadata.datareadyRX = True
-
-
-    def NewClient(self, tupleinfo):
+    def add_new_Client(self, tupleinfo):
         self.CBTCP2.addItem(tupleinfo[0] + ":" + str(tupleinfo[1]))
 
     def ChooseFile(self):
         files = QtWidgets.QFileDialog.getOpenFileNames(self, "CSV选择", "../res/data", "All Files (*)")[0]
         filecsv = pd.read_csv(files[0], sep=',')
-        self.metadata.filedataX = filecsv["X"]
-        self.metadata.filedataY = filecsv["Y"]
+
         self.LEFilePath.setText(files[0])
 
     def on_refreshCom(self):
@@ -154,38 +112,6 @@ class ControlBoxTab(ControlTab.Ui_Form, QtWidgets.QWidget, UDP.UdpLogic, TCP.Tcp
             THREAD.stop_thread(self.NewTimerY)
             self.metadata.save("./data.csv")
 
-    def NewTimerfunX(self):
-        while 1:
-            if self.RBTFile.isChecked():
-                if self.metadata.filedataX.__len__() > self.metadata.filedataindexX:
-                    self.metadata.CurrentdataX = self.metadata.filedataX[self.metadata.filedataindexX]
-                    self.metadata.DataStreamX.append(self.metadata.CurrentdataX)
-                    self.metadata.datareadyX = True
-                    self.metadata.filedataindexX += 1
-                else:
-                    self.signal_write_msgter.emit("文件读取完成！")
-                    self.metadata.filedataindexX = 0
-                    # stop_thread(self.NewTimerX)
-            while(self.metadata.datareadyX):
-                # print("")
-                pg.QtGui.QApplication.processEvents()
-
-    def NewTimerfunY(self):
-        while 1:
-            if self.RBTFile.isChecked():
-                if self.metadata.filedataY.__len__() > self.metadata.filedataindexY:
-                    self.metadata.CurrentdataY = self.metadata.filedataY[self.metadata.filedataindexY]
-                    self.metadata.DataStreamY.append(self.metadata.CurrentdataY)
-                    self.metadata.datareadyY = True
-                    self.metadata.filedataindexY += 1
-                else:
-                    self.signal_write_msgter.emit("文件读取完成！")
-                    self.metadata.filedataindexY = 0
-                    # stop_thread(self.NewTimerY)
-            while(self.metadata.datareadyY):
-                # print("")
-                # pass
-                pg.QtGui.QApplication.processEvents()
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)

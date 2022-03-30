@@ -2,7 +2,6 @@
 import binascii
 import re
 from PyQt5.QtSerialPort import QSerialPort
-from PyQt5 import QtCore
 import Signal
 
 
@@ -19,19 +18,19 @@ class PyQt_Serial(Signal.Signals):
         self.ser_NAME = "COM1"
         self.ser_BAUDRATE = 115200
 
-    def on_openSerial(self):
+    def Serial_start(self):
         self.ser_com.setPortName(self.ser_NAME)
         if self.ser_com.open(QSerialPort.ReadWrite) == False:
             self.signal_write_terminal.emit('开串口失败')
         else:
             self.ser_com.setBaudRate(self.ser_BAUDRATE)
-            self.ser_com.readyRead.connect(self.on_receiveData)  # 接收数据
+            self.ser_com.readyRead.connect(self.on_receiveData)  # 接收数据 没有使用多线程，而是使用QtSerial的监听机制
             self.signal_write_terminal.emit('开启串口 波特率是：'+str(self.ser_BAUDRATE))
 
-    def on_closeSerial(self):
+    def Serial_close(self):
         self.ser_com.close()
 
-    def on_sendData(self, txData):
+    def Serial_send(self, txData):
         if self.ser_HEXSEND:
             s = txData.replace(' ', '')
             if len(s) % 2 == 1:  # 如果16进制不是偶数个字符,去掉最后一个
@@ -49,7 +48,7 @@ class PyQt_Serial(Signal.Signals):
                 return
 
             try:
-                n = self.com.write(hexData)
+                n = self.ser_com.write(hexData)
             except:
                 self.signal_write_terminal.emit('发送出错')
                 return
@@ -57,7 +56,7 @@ class PyQt_Serial(Signal.Signals):
             n = self.ser_com.write(txData.encode(self.ser_encoding, "ignore"))
         self.ser_sendCount += n
 
-    def on_receiveData(self):
+    def Serial_recieve(self):
         receivedData = None
         try:
             '''将串口接收到的QByteArray格式数据转为bytes,并用gkb或utf8解码'''
@@ -66,16 +65,13 @@ class PyQt_Serial(Signal.Signals):
             self.signal_write_terminal.emit('接收出错')
 
         if len(receivedData) > 0:
-
             self.signal_PackedDataComing.emit(receivedData[0:20])
-
             self.ser_receiveCount += len(receivedData)
             if self.ser_HEXSHOW == False:
                 receivedData = receivedData.decode(self.ser_encoding, 'ignore')
                 # data_list = re.findall(r"\d+.*\d+", receivedData)
                 self.signal_write_msg.emit(receivedData)
                 self.signal_NewDataComing.emit(receivedData)
-
             else:
                 data = binascii.b2a_hex(receivedData).decode('ascii')
                 pattern = re.compile('.{2,2}')

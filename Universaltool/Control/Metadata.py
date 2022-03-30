@@ -1,75 +1,37 @@
 import numpy as np
 import pandas as pd
-import threading
+from PyQt5 import QtCore
+import struct
 class metadata:
     # this is the metadata structure that need's
-    def __init__(self):
-        self.DataStreamT=[]
-        self.DataStreamsudoT=[]
-        self.NUM = -1
-        self.trig = 0
-        self.Silence = 0
-        self.DataStreamX = []
-        self.DataStreamY = []
-        self.DataStreamZ = []
-        self.DataStreamRX = []
-        self.DataStreamRY = []
-        self.DataStreamRZ = []
-        self.DataStreamList = [self.DataStreamT,
-                               self.DataStreamX,self.DataStreamY,self.DataStreamZ,
-                               self.DataStreamRX,self.DataStreamRY,self.DataStreamRZ]
-        self.filedataX = []
-        self.filedataY = []
-        self.filedataindexX = 0
-        self.filedataindexY = 0
-
-        self.CurrentdataX = 0
-        self.CurrentdataY = 0
-        self.CurrentdataZ = 0
-        self.CurrentdataRX = 0
-        self.CurrentdataRY = 0
-        self.CurrentdataRZ = 0
-
-        self.datareadyX = False
-        self.datareadyY = False
-        self.datareadyZ = False
-        self.datareadyRX = False
-        self.datareadyRY = False
-        self.datareadyRZ = False
-
-        # self.Maxnum = 1000
-
-        # self.th = threading.Thread(target=self.autosaveandcut)
-    #
-    # def
+    MetaDataSignal = QtCore.pyqtSignal(int)
+    def __init__(self, n=1):
+        self.channel = n
+        self.DataStreamList = []
+        for i in range(self.channel+1):
+            self.DataStreamList.append([])
 
     def save(self, path, mode = 'w'):
+        dic_res = {"T":self.DataStreamList[0]}
         for i in range(5):
             print(len(self.DataStreamList[i]))
-
         if mode=='w':
-            list_res = {"T": self.DataStreamT, "X": self.DataStreamX, "Y": self.DataStreamY, "Z": self.DataStreamZ
-                        , "RX": self.DataStreamRX}
+            for i in range(1, self.channel):
+                dic_res["Data-{}".format(i)] = self.DataStreamList[i]
 
-        elif mode=="a":
-            list_res = np.array([self.DataStreamT, self.DataStreamX, self.DataStreamY, self.DataStreamZ
-                                    , self.DataStreamRX]).T
-
-        xml_df = pd.DataFrame(list_res, index=None)
+        xml_df = pd.DataFrame(dic_res, index=None)
         xml_df.to_csv(path, index=None, mode=mode)
-        print("OK")
+        print("Save Successfully! {}".format(path))
 
-    def fill(self):
-        for i in range(10):
-            self.DataStreamT.append(i)
-            self.DataStreamX.append(i)
-            self.DataStreamY.append(i)
-            self.DataStreamZ.append(i)
-            self.DataStreamRX.append(i)
-            self.DataStreamRY.append(i)
-            self.DataStreamRZ.append(i)
+    def Datasplit(self, ans, msg):
+        if ans==0:
+            datas = struct.unpack('<iiiii', msg)
+            for i in range(self.channel):
+                self.DataStreamList[i].append(datas[i])
+
+        self.MetaDataSignal.emit(ans)
 
 if __name__ == '__main__':
     D = metadata()
-    D.fill()
+    # D.fill()
     D.save("./1.csv", "a")
